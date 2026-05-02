@@ -16,29 +16,41 @@ oak_position="$(tmux show-option -gqv "@oak-position" 2>/dev/null)"
 : "${oak_position:=left}"
 
 session="$(tmux display-message -p '#{session_name}')"
-current_window="$(tmux display-message -p '#{window_id}')"
 
-oak_pane_id="$(tmux show-environment -g OAK_PANE_ID 2>/dev/null | sed 's/^OAK_PANE_ID=//')"
+enabled="$(tmux show-environment -g OAK_ENABLED 2>/dev/null | sed 's/^OAK_ENABLED=//')"
 
-if [ -n "$oak_pane_id" ]; then
-	pane_window="$(tmux display-message -p -t "$oak_pane_id" '#{window_id}' 2>/dev/null)"
-
-	if [ "$pane_window" = "$current_window" ]; then
-		tmux kill-pane -t "$oak_pane_id"
-		tmux set-environment -gu OAK_PANE_ID
-		exit 0
+if [ "$enabled" = "1" ]; then
+	# Toggle OFF: kill all oak sidebar panes in this session
+	while IFS= read -r line; do
+		pane_id="${line%% *}"
+		marker="${line##* }"
+		if [ "$marker" = "on" ] && [ -n "$pane_id" ]; then
+			tmux kill-pane -t "$pane_id" 2>/dev/null
+		fi
+	done < <(tmux list-panes -s -t "$session" -F '#{pane_id} #{@oak-sidebar}')
+	tmux set-environment -gu OAK_ENABLED
+else
+	# Toggle ON: create oak sidebar in every window
+	# -f = full-width split (spans entire viewport height)
+	# -b = before (left side)
+	# -h = horizontal (vertical split)
+	split_flags="-hf"
+	if [ "$oak_position" = "left" ]; then
+		split_flags="-hbf"
 	fi
 
-	tmux kill-pane -t "$oak_pane_id" 2>/dev/null
-	tmux set-environment -gu OAK_PANE_ID
+	current_win="$(tmux display-message -p '#{window_index}')"
+
+	while IFS= read -r win; do
+		d_flag="-d"
+		if [ "$win" = "$current_win" ]; then
+			d_flag=""
+		fi
+
+		pane_id="$(tmux split-window $split_flags $d_flag -t "$session:$win" -l "$oak_width" -P -F "#{pane_id}" \
+			"$OAK_BIN --session '$session'")"
+		tmux set-option -p -t "$pane_id" @oak-sidebar on 2>/dev/null
+	done < <(tmux list-windows -t "$session" -F '#{window_index}')
+
+	tmux set-environment -g OAK_ENABLED 1
 fi
-
-split_flags="-h"
-if [ "$oak_position" = "left" ]; then
-	split_flags="-hb"
-fi
-
-pane_id="$(tmux split-window $split_flags -l "$oak_width" -P -F "#{pane_id}" \
-	"$OAK_BIN --session '$session'")"
-
-tmux set-environment -g OAK_PANE_ID "$pane_id"

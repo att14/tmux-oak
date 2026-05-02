@@ -65,17 +65,20 @@ func (d *ClaudeDetector) Scan(panePIDs map[int]bool) (map[int]Agent, error) {
 			continue
 		}
 
-		ppid := getppid(sess.PID)
-		if ppid > 0 && panePIDs[ppid] {
-			result[ppid] = Agent{Name: d.Name(), Icon: d.Icon()}
-			continue
-		}
-
-		if ppid > 0 {
-			gppid := getppid(ppid)
-			if gppid > 0 && panePIDs[gppid] {
-				result[gppid] = Agent{Name: d.Name(), Icon: d.Icon()}
+		// Walk up the process tree (up to 5 levels) to find the pane PID.
+		// Claude may be several levels deep: pane shell → node → claude,
+		// or pane shell → zsh → wrapper → claude, etc.
+		pid := sess.PID
+		for range 5 {
+			ppid := getppid(pid)
+			if ppid <= 1 {
+				break
 			}
+			if panePIDs[ppid] {
+				result[ppid] = Agent{Name: d.Name(), Icon: d.Icon()}
+				break
+			}
+			pid = ppid
 		}
 	}
 

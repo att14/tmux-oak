@@ -3,9 +3,11 @@ package ui
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/att14/tmux-oak/internal/config"
 	"github.com/att14/tmux-oak/internal/detect"
+	"github.com/att14/tmux-oak/internal/git"
 	"github.com/att14/tmux-oak/internal/tmux"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -44,6 +46,7 @@ func NewModel(client *tmux.Client, session string, cfg config.Config, registry *
 type stateMsg struct{ state *tmux.State }
 type errMsg struct{ err error }
 type switchedMsg struct{}
+type tickMsg time.Time
 type previewMsg struct {
 	content string
 	target  string
@@ -88,8 +91,17 @@ func doSwitch(client *tmux.Client, session string, node TreeNode) tea.Cmd {
 	}
 }
 
+func tickCmd(d time.Duration) tea.Cmd {
+	return tea.Tick(d, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
 func (m *Model) Init() tea.Cmd {
-	return fetchState(m.client, m.session, m.ownPaneID)
+	return tea.Batch(
+		fetchState(m.client, m.session, m.ownPaneID),
+		tickCmd(time.Duration(m.cfg.Refresh)*time.Second),
+	)
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -134,6 +146,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.previewText = msg.content
 		m.previewTgt = msg.target
 		return m, nil
+
+	case tickMsg:
+		git.ClearCache()
+		return m, tea.Batch(
+			fetchState(m.client, m.session, m.ownPaneID),
+			tickCmd(time.Duration(m.cfg.Refresh)*time.Second),
+		)
 
 	case switchedMsg:
 		return m, fetchState(m.client, m.session, m.ownPaneID)

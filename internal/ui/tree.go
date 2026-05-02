@@ -60,18 +60,23 @@ func buildNodes(state *tmux.State, expanded map[int]bool) []TreeNode {
 func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, cfg config.Config, agents map[int]detect.Agent) string {
 	var sb strings.Builder
 
-	// Minimal header
 	sb.WriteString(headerStyle.Render("oak"))
 	sb.WriteByte('\n')
-	sb.WriteByte('\n')
 
-	prevWasPane := false
+	// Assign a group index to each node (increments on each window)
+	groupOf := make([]int, len(nodes))
+	group := 0
 	for i, node := range nodes {
-		// Blank line between window groups
 		if node.Kind == WindowNode && i > 0 {
-			if prevWasPane {
-				sb.WriteByte('\n')
-			}
+			group++
+		}
+		groupOf[i] = group
+	}
+
+	for i, node := range nodes {
+		bg := bandA
+		if groupOf[i]%2 == 1 {
+			bg = bandB
 		}
 
 		lines := renderNode(node, expanded, width, cfg, agents)
@@ -81,20 +86,45 @@ func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, 
 			if j > 0 {
 				sb.WriteByte('\n')
 			}
+			plain := stripAnsi(line)
 			if selected {
-				sb.WriteString(cursorBar)
-				sb.WriteString(highlightLine(line, width-1))
+				sb.WriteString(cursorAccent)
+				padded := plain + strings.Repeat(" ", max(0, width-1-lipgloss.Width(plain)))
+				sb.WriteString(lipgloss.NewStyle().
+					Foreground(cursorFg).
+					Background(cursorBg).
+					Render(padded))
 			} else {
-				sb.WriteString(" ")
-				sb.WriteString(line)
+				padded := plain + strings.Repeat(" ", max(0, width-lipgloss.Width(plain)))
+				sb.WriteString(applyBand(padded, node, bg))
 			}
 		}
 		sb.WriteByte('\n')
-
-		prevWasPane = node.Kind == PaneNode
 	}
 
 	return sb.String()
+}
+
+func applyBand(text string, node TreeNode, bg lipgloss.Color) string {
+	fg := lipgloss.Color("244")
+	switch node.Kind {
+	case WindowNode:
+		if node.Window.Active {
+			fg = lipgloss.Color("255")
+		} else {
+			fg = lipgloss.Color("250")
+		}
+	case PaneNode:
+		if node.Pane.Active {
+			fg = lipgloss.Color("252")
+		} else {
+			fg = lipgloss.Color("244")
+		}
+	}
+	return lipgloss.NewStyle().
+		Foreground(fg).
+		Background(bg).
+		Render(text)
 }
 
 func renderNode(node TreeNode, expanded map[int]bool, width int, cfg config.Config, agents map[int]detect.Agent) []string {
@@ -110,37 +140,32 @@ func renderNode(node TreeNode, expanded map[int]bool, width int, cfg config.Conf
 func renderWindowNode(node TreeNode, expanded map[int]bool, width int) []string {
 	w := node.Window
 
-	label := fmt.Sprintf("%d  %s", w.Index, w.Name)
+	label := fmt.Sprintf(" %d  %s", w.Index, w.Name)
 
 	if w.Active {
-		// Right-align the active indicator
-		styledLabel := windowStyle.Render(label)
-		labelWidth := lipgloss.Width(styledLabel) + 2 // +2 for outer padding
-		indicatorWidth := lipgloss.Width(activeIndicator)
-		pad := width - labelWidth - indicatorWidth
+		indicator := activeIndicator
+		labelWidth := lipgloss.Width(label)
+		indicatorWidth := lipgloss.Width(indicator)
+		pad := width - labelWidth - indicatorWidth - 1
 		if pad < 1 {
 			pad = 1
 		}
-		return []string{styledLabel + strings.Repeat(" ", pad) + activeIndicator}
+		return []string{label + strings.Repeat(" ", pad) + "●"}
 	}
 
-	return []string{windowDimStyle.Render(label)}
+	return []string{label}
 }
 
 func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]detect.Agent) []string {
 	p := node.Pane
 	var lines []string
 
-	label := paneLabel(p)
-	if agent, ok := agents[p.PID]; ok {
-		label += "  " + agentStyle.Render(agent.Icon)
+	label := "   " + paneLabel(p)
+	if _, ok := agents[p.PID]; ok {
+		label += "  🤖"
 	}
 
-	if p.Active {
-		lines = append(lines, paneStyle.Render(label))
-	} else {
-		lines = append(lines, paneDimStyle.Render(label))
-	}
+	lines = append(lines, label)
 
 	if cfg.ShowCwd || cfg.ShowGit {
 		var parts []string
@@ -149,11 +174,11 @@ func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]
 		}
 		if cfg.ShowGit {
 			if branch := git.Branch(p.CurrentPath); branch != "" {
-				parts = append(parts, metaBranchStyle.Render(branch))
+				parts = append(parts, branch)
 			}
 		}
 		if len(parts) > 0 {
-			lines = append(lines, metaStyle.Render(strings.Join(parts, "  ")))
+			lines = append(lines, "   "+strings.Join(parts, "  "))
 		}
 	}
 
@@ -168,15 +193,6 @@ func paneLabel(p *tmux.Pane) string {
 		}
 	}
 	return p.Command
-}
-
-func highlightLine(s string, width int) string {
-	plain := stripAnsi(s)
-	padded := plain + strings.Repeat(" ", max(0, width-lipgloss.Width(plain)))
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("255")).
-		Background(lipgloss.Color("236")).
-		Render(padded)
 }
 
 func stripAnsi(s string) string {

@@ -9,24 +9,19 @@ var (
 
 	windowStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("255")).
-			PaddingLeft(1)
+			Foreground(lipgloss.Color("255"))
 
 	windowDimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("246")).
-			PaddingLeft(1)
+			Foreground(lipgloss.Color("250"))
 
 	paneStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252")).
-			PaddingLeft(3)
+			Foreground(lipgloss.Color("252"))
 
 	paneDimStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("244")).
-			PaddingLeft(3)
+			Foreground(lipgloss.Color("244"))
 
 	metaStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			PaddingLeft(3)
+			Foreground(lipgloss.Color("240"))
 
 	metaBranchStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("72"))
@@ -34,14 +29,17 @@ var (
 	agentStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("141"))
 
-	cursorBar = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("75")).
-			Render("▎")
-
 	activeIndicator = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("75")).
 			Render("●")
 
-	separatorStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("236"))
+	cursorAccent = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("75")).
+			Render("▎")
+
+	bandA = lipgloss.Color("234")
+	bandB = lipgloss.Color("236")
+
+	cursorBg = lipgloss.Color("238")
+	cursorFg = lipgloss.Color("255")
 )

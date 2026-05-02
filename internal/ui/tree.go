@@ -59,28 +59,34 @@ func buildNodes(state *tmux.State, expanded map[int]bool) []TreeNode {
 func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, cfg config.Config, agents map[int]detect.Agent) string {
 	var sb strings.Builder
 
-	sb.WriteString(headerStyle.Render(" oak"))
+	// Minimal header
+	sb.WriteString(headerStyle.Render("oak"))
 	sb.WriteByte('\n')
-	sb.WriteString(separatorStyle.Render(strings.Repeat("─", width)))
 	sb.WriteByte('\n')
 
 	prevWasPane := false
 	for i, node := range nodes {
-		// Add spacing between window groups
-		if node.Kind == WindowNode && prevWasPane {
-			sb.WriteByte('\n')
+		// Blank line between window groups
+		if node.Kind == WindowNode && i > 0 {
+			if prevWasPane {
+				sb.WriteByte('\n')
+			}
 		}
 
-		line := renderNode(node, expanded, width, cfg, agents)
-		if i == cursor {
-			for j, l := range strings.Split(line, "\n") {
-				if j > 0 {
-					sb.WriteByte('\n')
-				}
-				sb.WriteString(selectedStyle.Width(width).Render(stripAnsi(l)))
+		lines := renderNode(node, expanded, width, cfg, agents)
+		selected := i == cursor
+
+		for j, line := range lines {
+			if j > 0 {
+				sb.WriteByte('\n')
 			}
-		} else {
-			sb.WriteString(line)
+			if selected {
+				sb.WriteString(cursorBar)
+				sb.WriteString(highlightLine(line, width-1))
+			} else {
+				sb.WriteString(" ")
+				sb.WriteString(line)
+			}
 		}
 		sb.WriteByte('\n')
 
@@ -90,67 +96,52 @@ func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, 
 	return sb.String()
 }
 
-func renderNode(node TreeNode, expanded map[int]bool, width int, cfg config.Config, agents map[int]detect.Agent) string {
+func renderNode(node TreeNode, expanded map[int]bool, width int, cfg config.Config, agents map[int]detect.Agent) []string {
 	switch node.Kind {
 	case WindowNode:
 		return renderWindowNode(node, expanded, width)
 	case PaneNode:
 		return renderPaneNode(node, width, cfg, agents)
 	}
-	return ""
+	return nil
 }
 
-func renderWindowNode(node TreeNode, expanded map[int]bool, width int) string {
+func renderWindowNode(node TreeNode, expanded map[int]bool, width int) []string {
 	w := node.Window
-	arrow := "▸"
-	if expanded[w.Index] {
-		arrow = "▾"
-	}
 
-	label := fmt.Sprintf(" %s %d:%s", arrow, w.Index, w.Name)
+	label := fmt.Sprintf("%d  %s", w.Index, w.Name)
 
 	if w.Active {
-		indicator := lipgloss.NewStyle().Foreground(activeColor).Render("●")
-		labelWidth := lipgloss.Width(label)
-		indicatorWidth := lipgloss.Width(indicator)
+		// Right-align the active indicator
+		styledLabel := windowStyle.Render(label)
+		labelWidth := lipgloss.Width(styledLabel) + 2 // +2 for outer padding
+		indicatorWidth := lipgloss.Width(activeIndicator)
 		pad := width - labelWidth - indicatorWidth
 		if pad < 1 {
 			pad = 1
 		}
-		return windowStyle.Render(label) + strings.Repeat(" ", pad) + indicator
+		return []string{styledLabel + strings.Repeat(" ", pad) + activeIndicator}
 	}
 
-	return windowDimStyle.Render(label)
+	return []string{windowDimStyle.Render(label)}
 }
 
-func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]detect.Agent) string {
+func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]detect.Agent) []string {
 	p := node.Pane
-	conn := connectorStyle.Render("├")
-	if node.IsLastChild {
-		conn = connectorStyle.Render("└")
-	}
-
 	var lines []string
 
 	label := p.Command
 	if agent, ok := agents[p.PID]; ok {
-		label += " " + agentStyle.Render(agent.Icon)
+		label += "  " + agentStyle.Render(agent.Icon)
 	}
 
-	mainLine := fmt.Sprintf("   %s %s", conn, label)
 	if p.Active {
-		lines = append(lines, paneActiveStyle.Render(mainLine))
+		lines = append(lines, paneStyle.Render(label))
 	} else {
-		lines = append(lines, paneDimStyle.Render(mainLine))
+		lines = append(lines, paneDimStyle.Render(label))
 	}
 
-	// Compact metadata: dir + branch on one line
 	if cfg.ShowCwd || cfg.ShowGit {
-		continuation := connectorStyle.Render("│")
-		if node.IsLastChild {
-			continuation = " "
-		}
-
 		var parts []string
 		if cfg.ShowCwd {
 			parts = append(parts, filepath.Base(p.CurrentPath))
@@ -160,14 +151,21 @@ func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]
 				parts = append(parts, metaBranchStyle.Render(branch))
 			}
 		}
-
 		if len(parts) > 0 {
-			metaLine := fmt.Sprintf("   %s  %s", continuation, strings.Join(parts, "  "))
-			lines = append(lines, metaStyle.Render(metaLine))
+			lines = append(lines, metaStyle.Render(strings.Join(parts, "  ")))
 		}
 	}
 
-	return strings.Join(lines, "\n")
+	return lines
+}
+
+func highlightLine(s string, width int) string {
+	plain := stripAnsi(s)
+	padded := plain + strings.Repeat(" ", max(0, width-lipgloss.Width(plain)))
+	return lipgloss.NewStyle().
+		Foreground(lipgloss.Color("255")).
+		Background(lipgloss.Color("236")).
+		Render(padded)
 }
 
 func stripAnsi(s string) string {

@@ -4,6 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"github.com/att14/tmux-oak/internal/tmux"
+	"github.com/att14/tmux-oak/internal/ui"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var (
@@ -26,5 +30,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("oak %s — session: %s (TUI not yet implemented)\n", version, *session)
+	client := tmux.NewClient()
+	model := ui.NewModel(client, *session)
+	p := tea.NewProgram(model, tea.WithAltScreen())
+
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "oak: %v\n", err)
+		os.Exit(1)
+	}
 }

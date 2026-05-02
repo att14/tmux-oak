@@ -17,6 +17,7 @@ type Pane struct {
 	Index       int
 	PID         int
 	Command     string
+	Title       string
 	CurrentPath string
 	Active      bool
 	ID          string
@@ -54,7 +55,7 @@ func Snapshot(client *Client, session string, excludePaneID string) (*State, err
 
 		paneOut, err := client.run("list-panes",
 			"-t", fmt.Sprintf("%s:%d", session, idx),
-			"-F", "#{pane_index}\t#{pane_pid}\t#{pane_current_command}\t#{pane_current_path}\t#{pane_active}\t#{pane_id}")
+			"-F", "#{pane_index}\t#{pane_pid}\t#{pane_current_command}\t#{pane_title}\t#{pane_current_path}\t#{pane_active}\t#{pane_id}")
 		if err != nil {
 			continue
 		}
@@ -63,12 +64,12 @@ func Snapshot(client *Client, session string, excludePaneID string) (*State, err
 			if pline == "" {
 				continue
 			}
-			pf := strings.SplitN(pline, "\t", 6)
-			if len(pf) < 6 {
+			pf := strings.SplitN(pline, "\t", 7)
+			if len(pf) < 7 {
 				continue
 			}
 
-			if excludePaneID != "" && pf[5] == excludePaneID {
+			if excludePaneID != "" && pf[6] == excludePaneID {
 				continue
 			}
 
@@ -82,9 +83,10 @@ func Snapshot(client *Client, session string, excludePaneID string) (*State, err
 				Index:       pidx,
 				PID:         ppid,
 				Command:     pf[2],
-				CurrentPath: pf[3],
-				Active:      pf[4] == "1",
-				ID:          pf[5],
+				Title:       pf[3],
+				CurrentPath: pf[4],
+				Active:      pf[5] == "1",
+				ID:          pf[6],
 			})
 		}
 

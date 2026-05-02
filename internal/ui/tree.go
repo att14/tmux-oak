@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -130,7 +131,7 @@ func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]
 	p := node.Pane
 	var lines []string
 
-	label := p.Command
+	label := paneLabel(p)
 	if agent, ok := agents[p.PID]; ok {
 		label += "  " + agentStyle.Render(agent.Icon)
 	}
@@ -157,6 +158,16 @@ func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]
 	}
 
 	return lines
+}
+
+func paneLabel(p *tmux.Pane) string {
+	if p.Title != "" {
+		host, _ := os.Hostname()
+		if p.Title != host {
+			return p.Title
+		}
+	}
+	return p.Command
 }
 
 func highlightLine(s string, width int) string {

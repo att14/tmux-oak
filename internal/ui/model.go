@@ -278,10 +278,59 @@ func (m *Model) autoExpand() {
 		return
 	}
 	node := m.nodes[m.cursor]
-	if node.Kind == WindowNode && !m.expanded[node.WindowIndex] {
-		m.expanded[node.WindowIndex] = true
-		m.rebuildNodes()
+	curWin := node.WindowIndex
+
+	changed := false
+
+	// Expand the window the cursor just entered
+	if !m.expanded[curWin] {
+		m.expanded[curWin] = true
+		changed = true
 	}
+
+	// Collapse non-active windows the cursor has left
+	for idx := range m.expanded {
+		if idx == curWin {
+			continue
+		}
+		if idx == m.activeWindowIndex() {
+			continue
+		}
+		delete(m.expanded, idx)
+		changed = true
+	}
+
+	if changed {
+		m.rebuildNodes()
+		// Reposition cursor on the same window node after rebuild
+		for i, n := range m.nodes {
+			if n.WindowIndex == curWin {
+				m.cursor = i
+				break
+			}
+		}
+	}
+}
+
+func (m *Model) activeWindowIndex() int {
+	if m.state == nil {
+		return -1
+	}
+	if m.focusPaneID != "" {
+		for _, w := range m.state.Windows {
+			for _, p := range w.Panes {
+				if p.ID == m.focusPaneID {
+					return w.Index
+				}
+			}
+		}
+	}
+	for _, w := range m.state.Windows {
+		if w.Active {
+			return w.Index
+		}
+	}
+	return -1
 }
 
 func (m *Model) previewCurrent() tea.Cmd {

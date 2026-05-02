@@ -20,7 +20,7 @@ func Load() Config {
 		ShowCmd:     optionBool("@oak-show-cmd", true),
 		ShowCwd:     optionBool("@oak-show-cwd", true),
 		ShowGit:     optionBool("@oak-show-git", true),
-		ShowPreview: optionBool("@oak-show-preview", true),
+		ShowPreview: optionBool("@oak-show-preview", false),
 		Width:       28,
 		Position:    optionStr("@oak-position", "left"),
 		Refresh:     3,

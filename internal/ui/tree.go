@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -60,12 +59,18 @@ func buildNodes(state *tmux.State, expanded map[int]bool) []TreeNode {
 func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, cfg config.Config, agents map[int]detect.Agent) string {
 	var sb strings.Builder
 
-	sb.WriteString(headerStyle.Render("oak"))
+	sb.WriteString(headerStyle.Render(" oak"))
 	sb.WriteByte('\n')
-	sb.WriteString(separatorStyle.Render(strings.Repeat("━", width)))
+	sb.WriteString(separatorStyle.Render(strings.Repeat("─", width)))
 	sb.WriteByte('\n')
 
+	prevWasPane := false
 	for i, node := range nodes {
+		// Add spacing between window groups
+		if node.Kind == WindowNode && prevWasPane {
+			sb.WriteByte('\n')
+		}
+
 		line := renderNode(node, expanded, width, cfg, agents)
 		if i == cursor {
 			for j, l := range strings.Split(line, "\n") {
@@ -78,6 +83,8 @@ func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, 
 			sb.WriteString(line)
 		}
 		sb.WriteByte('\n')
+
+		prevWasPane = node.Kind == PaneNode
 	}
 
 	return sb.String()
@@ -97,7 +104,7 @@ func renderWindowNode(node TreeNode, expanded map[int]bool, width int) string {
 	w := node.Window
 	arrow := "▸"
 	if expanded[w.Index] {
-		arrow = "▼"
+		arrow = "▾"
 	}
 
 	label := fmt.Sprintf(" %s %d:%s", arrow, w.Index, w.Name)
@@ -118,61 +125,49 @@ func renderWindowNode(node TreeNode, expanded map[int]bool, width int) string {
 
 func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]detect.Agent) string {
 	p := node.Pane
-	connector := "├"
+	conn := connectorStyle.Render("├")
 	if node.IsLastChild {
-		connector = "└"
+		conn = connectorStyle.Render("└")
 	}
 
 	var lines []string
 
-	mainLine := fmt.Sprintf("   %s %s", connector, p.Command)
-
+	label := p.Command
 	if agent, ok := agents[p.PID]; ok {
-		mainLine += " " + agent.Icon
+		label += " " + agentStyle.Render(agent.Icon)
 	}
 
+	mainLine := fmt.Sprintf("   %s %s", conn, label)
 	if p.Active {
 		lines = append(lines, paneActiveStyle.Render(mainLine))
 	} else {
 		lines = append(lines, paneDimStyle.Render(mainLine))
 	}
 
-	// Metadata lines (indented under the pane)
-	hasMetadata := cfg.ShowCwd || cfg.ShowGit
-	if hasMetadata {
-		continuation := "│"
+	// Compact metadata: dir + branch on one line
+	if cfg.ShowCwd || cfg.ShowGit {
+		continuation := connectorStyle.Render("│")
 		if node.IsLastChild {
 			continuation = " "
 		}
 
-		var meta []string
+		var parts []string
 		if cfg.ShowCwd {
-			meta = append(meta, shortenPath(p.CurrentPath))
+			parts = append(parts, filepath.Base(p.CurrentPath))
 		}
 		if cfg.ShowGit {
 			if branch := git.Branch(p.CurrentPath); branch != "" {
-				meta = append(meta, metaBranchStyle.Render(branch))
+				parts = append(parts, metaBranchStyle.Render(branch))
 			}
 		}
 
-		if len(meta) > 0 {
-			metaLine := fmt.Sprintf("   %s  %s", continuation, strings.Join(meta, "  "))
-			lines = append(lines, metaDimStyle.Render(metaLine))
+		if len(parts) > 0 {
+			metaLine := fmt.Sprintf("   %s  %s", continuation, strings.Join(parts, "  "))
+			lines = append(lines, metaStyle.Render(metaLine))
 		}
 	}
 
 	return strings.Join(lines, "\n")
-}
-
-func shortenPath(path string) string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return filepath.Base(path)
-	}
-	if strings.HasPrefix(path, home) {
-		return "~" + path[len(home):]
-	}
-	return path
 }
 
 func stripAnsi(s string) string {

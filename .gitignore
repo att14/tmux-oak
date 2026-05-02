@@ -29,3 +29,6 @@ Thumbs.db
 
 # goreleaser
 dist/
+
+# Install artifacts
+.oak-version

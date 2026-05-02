@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/att14/tmux-oak/internal/config"
 	"github.com/att14/tmux-oak/internal/tmux"
 	"github.com/att14/tmux-oak/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
@@ -30,8 +31,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	cfg := config.Load()
 	client := tmux.NewClient()
-	model := ui.NewModel(client, *session)
+	model := ui.NewModel(client, *session, cfg)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

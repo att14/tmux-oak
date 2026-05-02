@@ -27,5 +27,11 @@ var (
 	selectedStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("236"))
 
+	metaDimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("239"))
+
+	metaBranchStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("114"))
+
 	activeColor = lipgloss.Color("51")
 )

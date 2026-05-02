@@ -3,6 +3,7 @@ package ui
 import (
 	"os"
 
+	"github.com/att14/tmux-oak/internal/config"
 	"github.com/att14/tmux-oak/internal/tmux"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -12,6 +13,7 @@ type Model struct {
 	client    *tmux.Client
 	session   string
 	ownPaneID string
+	cfg       config.Config
 	state     *tmux.State
 	expanded  map[int]bool
 	nodes     []TreeNode
@@ -21,11 +23,12 @@ type Model struct {
 	err       error
 }
 
-func NewModel(client *tmux.Client, session string) *Model {
+func NewModel(client *tmux.Client, session string, cfg config.Config) *Model {
 	return &Model{
 		client:    client,
 		session:   session,
 		ownPaneID: os.Getenv("TMUX_PANE"),
+		cfg:       cfg,
 		expanded:  make(map[int]bool),
 	}
 }
@@ -164,7 +167,7 @@ func (m *Model) View() string {
 	if w == 0 {
 		w = 28
 	}
-	return renderTree(m.nodes, m.cursor, m.expanded, w)
+	return renderTree(m.nodes, m.cursor, m.expanded, w, m.cfg)
 }
 
 func (m *Model) rebuildNodes() {

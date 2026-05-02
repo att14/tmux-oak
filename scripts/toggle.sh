@@ -40,15 +40,18 @@ else
 	fi
 
 	current_win="$(tmux display-message -p '#{window_index}')"
+	prev_pane="$(tmux display-message -p '#{pane_id}')"
 
 	while IFS= read -r win; do
 		d_flag="-d"
+		focus_flag=""
 		if [ "$win" = "$current_win" ]; then
 			d_flag=""
+			focus_flag="--focus-pane '$prev_pane'"
 		fi
 
 		pane_id="$(tmux split-window $split_flags $d_flag -t "$session:$win" -l "$oak_width" -P -F "#{pane_id}" \
-			"$OAK_BIN --session '$session'")"
+			"$OAK_BIN --session '$session' $focus_flag")"
 		tmux set-option -p -t "$pane_id" @oak-sidebar on 2>/dev/null
 	done < <(tmux list-windows -t "$session" -F '#{window_index}')
 

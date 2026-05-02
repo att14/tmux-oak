@@ -14,11 +14,12 @@ import (
 )
 
 type Model struct {
-	client    *tmux.Client
-	session   string
-	ownPaneID string
-	cfg       config.Config
-	registry  *detect.Registry
+	client      *tmux.Client
+	session     string
+	ownPaneID   string
+	focusPaneID string
+	cfg         config.Config
+	registry    *detect.Registry
 	state     *tmux.State
 	agents      map[int]detect.Agent
 	previewText string
@@ -31,15 +32,16 @@ type Model struct {
 	err       error
 }
 
-func NewModel(client *tmux.Client, session string, cfg config.Config, registry *detect.Registry) *Model {
+func NewModel(client *tmux.Client, session string, cfg config.Config, registry *detect.Registry, focusPane string) *Model {
 	return &Model{
-		client:    client,
-		session:   session,
-		ownPaneID: os.Getenv("TMUX_PANE"),
-		cfg:       cfg,
-		registry:  registry,
-		expanded:  make(map[int]bool),
-		agents:    make(map[int]detect.Agent),
+		client:      client,
+		session:     session,
+		ownPaneID:   os.Getenv("TMUX_PANE"),
+		focusPaneID: focusPane,
+		cfg:         cfg,
+		registry:    registry,
+		expanded:    make(map[int]bool),
+		agents:      make(map[int]detect.Agent),
 	}
 }
 
@@ -125,18 +127,49 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.agents = m.registry.Scan(panePIDs)
 
 		if firstLoad {
-			for _, w := range m.state.Windows {
-				if w.Active {
-					m.expanded[w.Index] = true
+			// Expand the window containing the focus pane, or the active window
+			focused := false
+			if m.focusPaneID != "" {
+				for _, w := range m.state.Windows {
+					for _, p := range w.Panes {
+						if p.ID == m.focusPaneID {
+							m.expanded[w.Index] = true
+							focused = true
+							break
+						}
+					}
+					if focused {
+						break
+					}
+				}
+			}
+			if !focused {
+				for _, w := range m.state.Windows {
+					if w.Active {
+						m.expanded[w.Index] = true
+					}
 				}
 			}
 		}
 		m.rebuildNodes()
 		if firstLoad {
-			for i, n := range m.nodes {
-				if n.Kind == PaneNode && n.Pane.Active {
-					m.cursor = i
-					break
+			// Place cursor on the focus pane, or first active pane
+			placed := false
+			if m.focusPaneID != "" {
+				for i, n := range m.nodes {
+					if n.Kind == PaneNode && n.Pane.ID == m.focusPaneID {
+						m.cursor = i
+						placed = true
+						break
+					}
+				}
+			}
+			if !placed {
+				for i, n := range m.nodes {
+					if n.Kind == PaneNode && n.Pane.Active {
+						m.cursor = i
+						break
+					}
 				}
 			}
 		}

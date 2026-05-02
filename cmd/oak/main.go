@@ -20,6 +20,7 @@ var (
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
 	session := flag.String("session", "", "tmux session name")
+	focusPane := flag.String("focus-pane", "", "pane ID to highlight initially")
 	flag.Parse()
 
 	if *showVersion {
@@ -38,7 +39,7 @@ func main() {
 	registry := detect.NewRegistry()
 	registry.Register(detect.NewClaudeDetector())
 
-	model := ui.NewModel(client, *session, cfg, registry)
+	model := ui.NewModel(client, *session, cfg, registry, *focusPane)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

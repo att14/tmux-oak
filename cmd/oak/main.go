@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/att14/tmux-oak/internal/config"
+	"github.com/att14/tmux-oak/internal/detect"
 	"github.com/att14/tmux-oak/internal/tmux"
 	"github.com/att14/tmux-oak/internal/ui"
 	tea "github.com/charmbracelet/bubbletea"
@@ -33,7 +34,11 @@ func main() {
 
 	cfg := config.Load()
 	client := tmux.NewClient()
-	model := ui.NewModel(client, *session, cfg)
+
+	registry := detect.NewRegistry()
+	registry.Register(detect.NewClaudeDetector())
+
+	model := ui.NewModel(client, *session, cfg, registry)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	if _, err := p.Run(); err != nil {

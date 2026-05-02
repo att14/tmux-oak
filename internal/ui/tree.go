@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/att14/tmux-oak/internal/config"
+	"github.com/att14/tmux-oak/internal/detect"
 	"github.com/att14/tmux-oak/internal/git"
 	"github.com/att14/tmux-oak/internal/tmux"
 	"github.com/charmbracelet/lipgloss"
@@ -56,7 +57,7 @@ func buildNodes(state *tmux.State, expanded map[int]bool) []TreeNode {
 	return nodes
 }
 
-func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, cfg config.Config) string {
+func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, cfg config.Config, agents map[int]detect.Agent) string {
 	var sb strings.Builder
 
 	sb.WriteString(headerStyle.Render("oak"))
@@ -65,9 +66,8 @@ func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, 
 	sb.WriteByte('\n')
 
 	for i, node := range nodes {
-		line := renderNode(node, expanded, width, cfg)
+		line := renderNode(node, expanded, width, cfg, agents)
 		if i == cursor {
-			// Re-render with selection highlight on each line
 			for j, l := range strings.Split(line, "\n") {
 				if j > 0 {
 					sb.WriteByte('\n')
@@ -83,12 +83,12 @@ func renderTree(nodes []TreeNode, cursor int, expanded map[int]bool, width int, 
 	return sb.String()
 }
 
-func renderNode(node TreeNode, expanded map[int]bool, width int, cfg config.Config) string {
+func renderNode(node TreeNode, expanded map[int]bool, width int, cfg config.Config, agents map[int]detect.Agent) string {
 	switch node.Kind {
 	case WindowNode:
 		return renderWindowNode(node, expanded, width)
 	case PaneNode:
-		return renderPaneNode(node, width, cfg)
+		return renderPaneNode(node, width, cfg, agents)
 	}
 	return ""
 }
@@ -116,7 +116,7 @@ func renderWindowNode(node TreeNode, expanded map[int]bool, width int) string {
 	return windowDimStyle.Render(label)
 }
 
-func renderPaneNode(node TreeNode, width int, cfg config.Config) string {
+func renderPaneNode(node TreeNode, width int, cfg config.Config, agents map[int]detect.Agent) string {
 	p := node.Pane
 	connector := "├"
 	if node.IsLastChild {
@@ -125,12 +125,12 @@ func renderPaneNode(node TreeNode, width int, cfg config.Config) string {
 
 	var lines []string
 
-	// Main pane line: command name
-	cmdLabel := p.Command
-	if cfg.ShowCmd {
-		cmdLabel = p.Command
+	mainLine := fmt.Sprintf("   %s %s", connector, p.Command)
+
+	if agent, ok := agents[p.PID]; ok {
+		mainLine += " " + agent.Icon
 	}
-	mainLine := fmt.Sprintf("   %s %s", connector, cmdLabel)
+
 	if p.Active {
 		lines = append(lines, paneActiveStyle.Render(mainLine))
 	} else {

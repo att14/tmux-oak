@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/att14/tmux-oak/internal/config"
+	"github.com/att14/tmux-oak/internal/detect"
 	"github.com/att14/tmux-oak/internal/tmux"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -14,7 +15,9 @@ type Model struct {
 	session   string
 	ownPaneID string
 	cfg       config.Config
+	registry  *detect.Registry
 	state     *tmux.State
+	agents    map[int]detect.Agent
 	expanded  map[int]bool
 	nodes     []TreeNode
 	cursor    int
@@ -23,13 +26,15 @@ type Model struct {
 	err       error
 }
 
-func NewModel(client *tmux.Client, session string, cfg config.Config) *Model {
+func NewModel(client *tmux.Client, session string, cfg config.Config, registry *detect.Registry) *Model {
 	return &Model{
 		client:    client,
 		session:   session,
 		ownPaneID: os.Getenv("TMUX_PANE"),
 		cfg:       cfg,
+		registry:  registry,
 		expanded:  make(map[int]bool),
+		agents:    make(map[int]detect.Agent),
 	}
 }
 
@@ -75,6 +80,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case stateMsg:
 		firstLoad := m.state == nil
 		m.state = msg.state
+
+		panePIDs := make(map[int]bool)
+		for _, w := range m.state.Windows {
+			for _, p := range w.Panes {
+				panePIDs[p.PID] = true
+			}
+		}
+		m.agents = m.registry.Scan(panePIDs)
+
 		if firstLoad {
 			for _, w := range m.state.Windows {
 				if w.Active {
@@ -167,7 +181,7 @@ func (m *Model) View() string {
 	if w == 0 {
 		w = 28
 	}
-	return renderTree(m.nodes, m.cursor, m.expanded, w, m.cfg)
+	return renderTree(m.nodes, m.cursor, m.expanded, w, m.cfg, m.agents)
 }
 
 func (m *Model) rebuildNodes() {

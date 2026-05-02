@@ -13,10 +13,10 @@ type keyMap struct {
 
 var keys = keyMap{
 	Up: key.NewBinding(
-		key.WithKeys("up", "k"),
+		key.WithKeys("up", "k", "ctrl+p"),
 	),
 	Down: key.NewBinding(
-		key.WithKeys("down", "j"),
+		key.WithKeys("down", "j", "ctrl+n"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),

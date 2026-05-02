@@ -126,9 +126,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if firstLoad {
 			for _, w := range m.state.Windows {
-				if w.Active {
-					m.expanded[w.Index] = true
-				}
+				m.expanded[w.Index] = true
 			}
 		}
 		m.rebuildNodes()

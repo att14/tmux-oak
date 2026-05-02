@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/att14/tmux-oak/internal/config"
@@ -17,8 +18,10 @@ type Model struct {
 	cfg       config.Config
 	registry  *detect.Registry
 	state     *tmux.State
-	agents    map[int]detect.Agent
-	expanded  map[int]bool
+	agents      map[int]detect.Agent
+	previewText string
+	previewTgt  string
+	expanded    map[int]bool
 	nodes     []TreeNode
 	cursor    int
 	width     int
@@ -41,6 +44,10 @@ func NewModel(client *tmux.Client, session string, cfg config.Config, registry *
 type stateMsg struct{ state *tmux.State }
 type errMsg struct{ err error }
 type switchedMsg struct{}
+type previewMsg struct {
+	content string
+	target  string
+}
 
 func fetchState(client *tmux.Client, session, excludeID string) tea.Cmd {
 	return func() tea.Msg {
@@ -49,6 +56,22 @@ func fetchState(client *tmux.Client, session, excludeID string) tea.Cmd {
 			return errMsg{err}
 		}
 		return stateMsg{s}
+	}
+}
+
+func capturePreview(client *tmux.Client, session string, node TreeNode) tea.Cmd {
+	if node.Kind != PaneNode {
+		return nil
+	}
+	wIdx := node.WindowIndex
+	pIdx := node.PaneIndex
+	target := fmt.Sprintf("%d.%d", wIdx, pIdx)
+	return func() tea.Msg {
+		content, err := client.CapturePane(session, wIdx, pIdx, 20)
+		if err != nil {
+			return previewMsg{content: "", target: target}
+		}
+		return previewMsg{content: content, target: target}
 	}
 }
 
@@ -105,6 +128,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+		return m, m.previewCurrent()
+
+	case previewMsg:
+		m.previewText = msg.content
+		m.previewTgt = msg.target
 		return m, nil
 
 	case switchedMsg:
@@ -129,11 +157,13 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
+			return m, m.previewCurrent()
 		}
 
 	case key.Matches(msg, keys.Down):
 		if m.cursor < len(m.nodes)-1 {
 			m.cursor++
+			return m, m.previewCurrent()
 		}
 
 	case key.Matches(msg, keys.Enter):
@@ -181,7 +211,26 @@ func (m *Model) View() string {
 	if w == 0 {
 		w = 28
 	}
-	return renderTree(m.nodes, m.cursor, m.expanded, w, m.cfg, m.agents)
+	view := renderTree(m.nodes, m.cursor, m.expanded, w, m.cfg, m.agents)
+	if m.cfg.ShowPreview && m.previewText != "" {
+		view += "\n" + renderPreview(m.previewText, m.previewTgt, w, previewLines)
+	}
+	return view
+}
+
+func (m *Model) previewCurrent() tea.Cmd {
+	if !m.cfg.ShowPreview {
+		return nil
+	}
+	if m.cursor >= 0 && m.cursor < len(m.nodes) {
+		node := m.nodes[m.cursor]
+		if node.Kind == PaneNode {
+			return capturePreview(m.client, m.session, node)
+		}
+	}
+	m.previewText = ""
+	m.previewTgt = ""
+	return nil
 }
 
 func (m *Model) rebuildNodes() {

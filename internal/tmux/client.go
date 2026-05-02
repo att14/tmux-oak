@@ -30,3 +30,9 @@ func (c *Client) SelectPane(session string, windowIndex, paneIndex int) error {
 	_, err := c.run("select-pane", "-t", fmt.Sprintf("%s:%d.%d", session, windowIndex, paneIndex))
 	return err
 }
+
+func (c *Client) CapturePane(session string, windowIndex, paneIndex, lines int) (string, error) {
+	target := fmt.Sprintf("%s:%d.%d", session, windowIndex, paneIndex)
+	startLine := fmt.Sprintf("-%d", lines)
+	return c.run("capture-pane", "-p", "-t", target, "-S", startLine)
+}

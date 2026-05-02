@@ -72,6 +72,10 @@ func Snapshot(client *Client, session string, excludePaneID string) (*State, err
 				continue
 			}
 
+			if pf[2] == "oak" {
+				continue
+			}
+
 			pidx, _ := strconv.Atoi(pf[0])
 			ppid, _ := strconv.Atoi(pf[1])
 			w.Panes = append(w.Panes, Pane{

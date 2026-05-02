@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+
 type Model struct {
 	client      *tmux.Client
 	session     string
@@ -209,12 +210,14 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Up):
 		if m.cursor > 0 {
 			m.cursor--
+			m.autoExpand()
 			return m, m.previewCurrent()
 		}
 
 	case key.Matches(msg, keys.Down):
 		if m.cursor < len(m.nodes)-1 {
 			m.cursor++
+			m.autoExpand()
 			return m, m.previewCurrent()
 		}
 
@@ -268,6 +271,17 @@ func (m *Model) View() string {
 		view += "\n" + renderPreview(m.previewText, m.previewTgt, w, previewLines)
 	}
 	return view
+}
+
+func (m *Model) autoExpand() {
+	if m.cursor < 0 || m.cursor >= len(m.nodes) {
+		return
+	}
+	node := m.nodes[m.cursor]
+	if node.Kind == WindowNode && !m.expanded[node.WindowIndex] {
+		m.expanded[node.WindowIndex] = true
+		m.rebuildNodes()
+	}
 }
 
 func (m *Model) previewCurrent() tea.Cmd {
